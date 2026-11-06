@@ -6,9 +6,10 @@ installed manually. This implementation session executes no SQL, contacts no AI
 provider, uploads no media, and reads no real AI credential. Tests use synthetic
 credentials, mock fetch/Supabase/Storage/renderers and in-memory image fixtures.
 
-There are **no generation routes, Server Actions, browser UI, history pages or
-production artifact renderer** in this change. Importing these modules registers
-no entry point and starts no work. Every module is `server-only`; use Node.js,
+The core itself registers **no generation routes, Server Actions, browser UI,
+history pages or production artifact renderer**. Step 7E.1 now adds separate
+[protected generation routes and an upload helper](../generation/README.md).
+Importing the core starts no work. Every module is `server-only`; use Node.js,
 not Edge, for Sharp/crypto. No Supabase client or SQL migration is replaced.
 
 ## Modules
@@ -31,7 +32,11 @@ declaration makes successful native decoding a required runtime capability.
 
 ## Entry and upload contract for Step 7E
 
-A future authenticated POST/Server Action must independently invoke the guard,
+The following contract is now wired by Step 7E.1; see the endpoint documentation
+above for JSON/origin limits and the browser upload helper. Renderer integration
+and request quotas still precede enabling real generation.
+
+The authenticated POST handlers independently invoke the guard,
 then construct `createServerExecutionEngine({ renderer, hostBudgetMs })` inside
 the request. The core itself also authorizes preparation/execution and rechecks
 the same user before each step and artifact stage. Do not cache the factory,
@@ -45,15 +50,15 @@ from a page render, prefetch, effect, or GET request.
 2. Only a prepared result includes an authorized upload descriptor containing
    the fixed private bucket, database-generated input path and MIME. Upload the
    original file through the authenticated Storage client with `upsert: false`.
-   This transport is a future Step 7E responsibility; `prepare` does not upload
+   The Step 7E helper handles this transport; `prepare` does not upload
    bytes or claim that client-supplied metadata is verified.
 3. Call `execute(runId, { signal })`. No lease/provider result is accepted from
    the entry-point payload. Only the run ID and cancellation signal are inputs.
 
 Direct Storage input upload avoids sending a 5 MiB file through a Vercel
 function's 4.5 MB request-body limit. The new metadata request/returned DTO is
-small. Future routes still need CSRF/origin checks, bounded JSON parsing,
-request-level quotas and correct Node duration configuration
+small. Step 7E adds CSRF/origin checks, bounded JSON parsing and Node duration
+configuration. Request-level quotas remain required before enabling real AI
 ([Vercel limits](https://vercel.com/docs/functions/limitations)).
 
 The public result is `{ runId, status, error?: { code, message } }`, plus an
@@ -232,9 +237,10 @@ Storage, clock, fetch and renderer. It is not a PostgreSQL/RLS/Storage emulator.
 Earlier suites remain unchanged. No live test proves the manually installed SQL
 matches this source; future isolated/user-approved integration must check that.
 
-- **7E:** protected metadata preparation/direct private upload/execute entry,
-  CSRF and JSON limits, duration settings, request quotas and server credential
-  configuration. Do not send client tokens, snapshots or provider results.
+- **7E:** protected metadata preparation/direct private upload/execute/status
+  routes, CSRF and JSON limits, and duration settings are implemented separately.
+  Request quotas and server credential configuration remain pre-generation work.
+  Do not send client tokens, snapshots or provider results.
 - **7F:** actual safe captioned-image renderer and final generation UI. Test PNG
   layout, size and latency; do not substitute the original image for generated
   media or a test fixture for a renderer.

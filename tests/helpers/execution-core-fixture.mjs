@@ -18,7 +18,8 @@ export const plain = value => JSON.parse(JSON.stringify(value));
 
 export function loadExecution(overrides = {}) {
   const cache = new Map();
-  const globals = { Buffer, Uint8Array, URL, TextDecoder, AbortController, AbortSignal, ReadableStream, performance,
+  const globals = { Buffer, Uint8Array, URL, TextDecoder, TextEncoder, Request, Response, Headers, crypto,
+    AbortController, AbortSignal, ReadableStream, performance,
     setTimeout, clearTimeout, fetch: () => { throw new Error("Live network is disabled in tests"); },
     process: { env: new Proxy({}, { get() { throw new Error("Real environment reads are disabled in tests"); } }) } };
   function load(path) {

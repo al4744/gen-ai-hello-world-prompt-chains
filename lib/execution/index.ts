@@ -5,7 +5,7 @@ import { createOpenRouterProvider } from "./openrouter";
 import { createExecutionPersistence, createExecutionStorage } from "./supabase";
 import type { ArtifactRenderer } from "./types";
 
-/** No route or Server Action is registered. A future entry point must also guard. */
+/** Request-scoped factory. Entry points must independently guard as well. */
 export function createServerExecutionEngine(options: { renderer?: ArtifactRenderer; hostBudgetMs?: number } = {}) {
   return createExecutionEngine({
     ...options,
