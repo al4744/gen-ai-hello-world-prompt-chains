@@ -2,12 +2,12 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { requireSuperadmin } from "@/lib/auth/require-superadmin";
-import { formatCreatedAt } from "@/lib/chains/model";
 import { getHistoryRun } from "@/lib/history/data";
 import { completedMediaHref, historyHref, savedCaptionAlternatives } from "@/lib/history/model";
 import { ChainPage, ChainReadError } from "@/components/chains/chain-ui";
 import CompletedImage from "@/components/history/completed-image";
 import { SavedCaptions } from "@/components/history/history-gallery";
+import LocalDateTime from "@/components/history/local-date-time";
 
 export const instant = false;
 
@@ -28,8 +28,8 @@ export default async function HistoryDetailPage({ params }: { params: Promise<{ 
         <section className="rounded-2xl border border-border bg-surface p-6">
           <h2 className="text-base font-semibold">Generation details</h2>
           <dl className="mt-4 space-y-4 text-sm"><div><dt className="text-xs text-muted">Prompt chain when generated</dt><dd className="mt-1 break-words">{entry.chainName}</dd></div>
-            <div><dt className="text-xs text-muted">Created</dt><dd className="mt-1"><time dateTime={entry.createdAt}>{formatCreatedAt(entry.createdAt)}</time></dd></div>
-            <div><dt className="text-xs text-muted">Completed</dt><dd className="mt-1"><time dateTime={entry.completedAt}>{formatCreatedAt(entry.completedAt)}</time></dd></div></dl>
+            <div><dt className="text-xs text-muted">Created</dt><dd className="mt-1"><LocalDateTime value={entry.createdAt} /></dd></div>
+            <div><dt className="text-xs text-muted">Completed</dt><dd className="mt-1"><LocalDateTime value={entry.completedAt} /></dd></div></dl>
           <div className="mt-5 flex flex-wrap gap-3"><a href={completedMediaHref(entry.id, true)} download={`caption-${entry.id}.png`} className="button-primary">Download PNG</a>
             {entry.currentChainId ? <Link href={`/chains/${entry.currentChainId}`} prefetch={false} className="button-secondary">Open prompt chain</Link> : <p className="text-xs leading-5 text-muted">The original chain has been deleted. This saved generation remains available.</p>}
           </div>

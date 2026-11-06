@@ -3,7 +3,7 @@
 `/history` is workspace item 04. `/history?chain=<UUID>` scopes the gallery to the
 immutable original prompt-chain ID; every existing chain detail page links there,
 including the read-only system chain. `/history/<run UUID>` shows the complete
-saved captions, captioned PNG, UTC creation/completion times, download, chain
+saved captions, captioned PNG, browser-local creation/completion times, download, chain
 history and Generate links. Deleted chains retain their history without a broken
 live-chain link. History is readable even while live generation is disabled.
 
@@ -15,6 +15,16 @@ headers; the session client's database fetches also use `no-store`. No `use cach
 public prerendered record, privileged client or new API permission is introduced.
 The installed history RLS intentionally allows **all current superadmins** to
 read saved runs across creator accounts. No creator-only filter is invented.
+
+History dates use `LocalDateTime` and the small `dates.ts` formatter. SSR and
+initial hydration render an identical loading placeholder; after hydration,
+`Intl.DateTimeFormat` uses the viewer's browser timezone with a short zone name
+(such as EST/EDT, or an Intl-provided GMT offset where abbreviations are unavailable).
+The formatter is created in the browser rather than cached on the server; no
+environment variable is changed. Daylight saving and calendar-date conversion come from Intl.
+Invalid, absent or timezone-less timestamps show `Unavailable`. Original values
+remain in the semantic `time` element's `dateTime` attribute; database values,
+query ordering and the chain-directory date formatter are unchanged.
 
 ## Query and integrity boundary
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { formatCreatedAt } from "@/lib/chains/model";
 import { captionPreview, completedMediaHref, historyHref, savedCaptionAlternatives, type HistoryEntry } from "@/lib/history/model";
 import CompletedImage from "./completed-image";
+import LocalDateTime from "./local-date-time";
 
 export function SavedCaptions({ entry, preview = false }: { entry: HistoryEntry; preview?: boolean }) {
   const alternatives = savedCaptionAlternatives(entry);
@@ -18,7 +18,7 @@ export default function HistoryGallery({ entries }: { entries: HistoryEntry[] })
       <div className="space-y-4 border-t border-border p-5">
         <div>
           <h2 className="break-words text-base font-semibold"><Link href={`/history/${entry.id}`} prefetch={false} className="text-link">{entry.chainName}</Link></h2>
-          <time dateTime={entry.createdAt} className="mt-2 block text-xs leading-5 text-muted">Created {formatCreatedAt(entry.createdAt)}</time>
+          <LocalDateTime value={entry.createdAt} prefix="Created " className="mt-2 block text-xs leading-5 text-muted" />
         </div>
         <div><p className="mb-3 text-xs font-medium text-muted">Caption preview</p><SavedCaptions entry={entry} preview /></div>
         <div className="flex flex-wrap gap-2">

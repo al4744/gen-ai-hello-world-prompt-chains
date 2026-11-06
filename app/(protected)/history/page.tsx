@@ -32,7 +32,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
     actions={<Link href="/generate" prefetch={false} className="button-primary">Generate an image</Link>}>
     <HistoryFilter chainId={filter.chainId} choices={[...choices].sort((a, b) => a[1].localeCompare(b[1], "en"))} />
     <div className="mb-5"><h2 className="break-words text-base font-semibold">{selectedName ? `Generations from ${selectedName}` : "All completed generations"}</h2>
-      <p className="mt-2 text-xs leading-5 text-muted">Each generation keeps the chain name and captions saved when it ran. Dates are shown in UTC.</p>
+      <p className="mt-2 text-xs leading-5 text-muted">Each generation keeps the chain name and captions saved when it ran. Dates are shown in your local time zone.</p>
     </div>
     {directory.status === "error" && <p role="status" className="feedback-success mb-5 text-muted">The chain directory could not be loaded. You can still browse saved generations and filter using the chains shown here.</p>}
     {history.omitted > 0 && <p role="status" className="feedback-success mb-5 text-muted">Some saved entries could not be verified and are hidden.</p>}

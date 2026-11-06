@@ -87,9 +87,11 @@ function fixture(options = {}) {
   }
   const shared = ui("components/chains/chain-ui.tsx", {});
   const image = ui("components/history/completed-image.tsx", {});
-  const gallery = ui("components/history/history-gallery.tsx", { "./completed-image": image });
+  const localTime = ui("components/history/local-date-time.tsx", { "@/lib/history/dates": load("lib/history/dates.ts") });
+  const gallery = ui("components/history/history-gallery.tsx", { "./completed-image": image, "./local-date-time": localTime });
   const filter = ui("components/history/history-filter.tsx", {});
-  const common = { "@/components/chains/chain-ui": shared, "@/components/history/history-gallery": gallery, "@/components/history/completed-image": image };
+  const common = { "@/components/chains/chain-ui": shared, "@/components/history/history-gallery": gallery, "@/components/history/completed-image": image,
+    "@/components/history/local-date-time": localTime };
   f.Page = ui("app/(protected)/history/page.tsx", { ...common,
     "@/components/history/history-filter": filter,
     "@/lib/generation/chains": { listGenerationChains: async supplied => {
@@ -339,6 +341,17 @@ test("gallery and full view use only the existing protected media preview/downlo
   assert.match(full, /Saved captions/); assert.match(full, /Download PNG/); assert.match(full, /href="\/generate"/); safe(full);
   assert.equal(f.model.completedMediaHref(runId, true), `/api/generation/runs/${runId}/media?download=1`);
   assert.throws(() => f.model.completedMediaHref("https://attacker.test"));
+});
+
+test("gallery and both detail timestamps use hydration-safe local time without changing saved values", async () => {
+  const f = fixture(), before = structuredClone(f.rows);
+  const gallery = renderToStaticMarkup(await f.Page({ searchParams: Promise.resolve({}) }));
+  assert.match(gallery, /Dates are shown in your local time zone/); assert.doesNotMatch(gallery, /Dates are shown in UTC/);
+  assert.equal((gallery.match(/Loading local time/g) ?? []).length, 1);
+  const full = renderToStaticMarkup(await f.Detail({ params: Promise.resolve({ runId }) }));
+  assert.equal((full.match(/Loading local time/g) ?? []).length, 2);
+  assert.ok(full.includes(before[0].created_at)); assert.ok(full.includes(before[0].completed_at));
+  assert.deepEqual(f.rows, before);
 });
 
 test("invalid, missing or unfinished detail requests never render a gallery image", async () => {
