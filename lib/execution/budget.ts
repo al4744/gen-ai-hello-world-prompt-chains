@@ -77,7 +77,8 @@ export class ExecutionBudget {
     return ms;
   }
   beforeStep() {
-    if (this.remaining() < LIMITS.finalReserveMs + LIMITS.ioMs + LIMITS.minProviderMs) {
+    // Authorization, start_step and complete_step each need an I/O allowance.
+    if (this.remaining() < LIMITS.finalReserveMs + 3 * LIMITS.ioMs + LIMITS.minProviderMs) {
       throw new ExecutionFault("deadline_exceeded");
     }
   }

@@ -87,6 +87,7 @@ export async function executionFixture({ mode = "sequential", count = 3, format 
     name: `Step ${i + 1}`, prompt_template: i === 2 && mode === "composed" ? "<context>{{user_prompt}}</context>" : `Literal instruction ${i + 1} {{never_evaluate}}` }));
   const f = {
     load, clock, userId, runId, bytes, authorized: true, calls: [], requests: [], uploads: [], reads: [],
+    otherRuns: [], persistenceQueries: [], diagnostics: [],
     refuse: null, throwAt: null, afterCommit: null, readFailure: false, uploadFailure: false, badUploadReceipt: false,
     leaseDelta: 120_000, dbPrompt: "Authoritative composed prompt from the RPC; $& and {{literal}} stay literal.",
     row: { id: runId, creator_id: userId, creator_id_snapshot: userId, original_chain_id: chainId, current_chain_id: chainId,
@@ -122,7 +123,23 @@ export async function executionFixture({ mode = "sequential", count = 3, format 
       assert.equal(name, "prepare_prompt_chain_run_v1");
       assert.equal(args.p_chain_id, chainId);
     } else {
-      assert.equal(name, "advance_prompt_chain_run_v1"); assert.equal(args.p_run_id, runId);
+      assert.equal(name, "advance_prompt_chain_run_v1");
+      if (op === "expire" && args.p_run_id !== runId) {
+        const stale = f.otherRuns.find(row => row.id === args.p_run_id);
+        if (!stale || stale.creator_id !== userId) return { data: null, error: { code: "42501" } };
+        if (["prepared", "running"].includes(stale.status)) {
+          if (Date.parse(stale.deadline_at) > clock.now()) return { data: null, error: { code: "55000" } };
+          stale.status = "interrupted";
+          stale.error_code = "execution_expired";
+          for (const step of stale.steps ?? []) {
+            if (step.status === "running") step.status = "interrupted";
+            if (step.status === "pending") step.status = "skipped";
+          }
+        }
+        if (f.afterCommit) await f.afterCommit(op, args, signal);
+        return { data: { run_id: stale.id, status: stale.status, accepted: false }, error: null };
+      }
+      assert.equal(args.p_run_id, runId);
       if (!["prepared", "running"].includes(f.row.status)) return { data: { ...data, accepted: false }, error: null };
       if (Date.parse(f.row.deadline_at) <= clock.now()) {
         terminal("interrupted", "execution_expired"); return { data: { ...data, status: "interrupted", accepted: false }, error: null };
@@ -131,6 +148,7 @@ export async function executionFixture({ mode = "sequential", count = 3, format 
       if (op === "claim") {
         if (f.row.status !== "prepared") return { data: { ...data, accepted: false }, error: null };
         if (!f.row.current_chain_id || payload.verified_input_sha256 !== f.row.input_sha256 || !f.objects.has(f.row.input_path)) throw new Error("Invalid claim");
+        if (f.otherRuns.some(row => row.creator_id === userId && row.status === "running")) return { data: null, error: { code: "55000", message: "SECRET another_run_is_active" } };
         f.row.status = "running"; f.row.deadline_at = new Date(clock.now() + f.leaseDelta).toISOString();
         data = { ...data, status: "running", deadline_at: f.row.deadline_at, lease_token: "a".repeat(64) };
       } else {
@@ -172,11 +190,19 @@ export async function executionFixture({ mode = "sequential", count = 3, format 
     rpc: (name, args) => ({ abortSignal: signal => rpc(name, args, signal) }),
     from(table) {
       assert.equal(table, "prompt_chain_runs");
+      const filters = {}, query = { filters, fields: "" }; f.persistenceQueries.push(query);
       const builder = {
-        select(fields) { assert.ok(!fields.includes("*") && !fields.includes("lease_token_hash")); return builder; },
-        eq(field, id) { assert.equal(field, "id"); assert.equal(id, runId); return builder; },
+        select(fields) { assert.ok(!fields.includes("*") && !fields.includes("lease_token_hash")); query.fields = fields; return builder; },
+        eq(field, value) { assert.ok(["id", "creator_id", "status"].includes(field)); filters[field] = value; return builder; },
         abortSignal() { return builder; },
-        async maybeSingle() { return !f.authorized || f.readFailure ? { data: null, error: { message: "SECRET query failure" } } : { data: structuredClone(f.row), error: null }; },
+        async maybeSingle() {
+          if (!f.authorized || f.readFailure) return { data: null, error: { message: "SECRET query failure" } };
+          if (filters.id) { assert.equal(filters.id, runId); return { data: structuredClone(f.row), error: null }; }
+          assert.equal(filters.creator_id, userId); assert.equal(filters.status, "running");
+          const rows = [f.row, ...f.otherRuns].filter(row => row.creator_id === filters.creator_id && row.status === filters.status);
+          if (rows.length > 1) return { data: null, error: { message: "SECRET duplicate active runs" } };
+          return { data: structuredClone(rows[0] ?? null), error: null };
+        },
       };
       return builder;
     },
@@ -204,8 +230,9 @@ export async function executionFixture({ mode = "sequential", count = 3, format 
   const adapters = load("lib/execution/supabase.ts"), engine = load("lib/execution/engine.ts"), openrouter = load("lib/execution/openrouter.ts");
   f.provider = openrouter.createOpenRouterProvider({ clock, getApiKey: () => "synthetic-test-credential",
     fetch: async (url, options) => { f.requests.push({ url, options, body: JSON.parse(options.body) }); return f.reply(f.requests.length, options.signal); } });
-  f.session = { userId, persistence: adapters.createExecutionPersistence(f.client, userId), storage: adapters.createExecutionStorage(f.client) };
+  f.session = { userId, persistence: adapters.createExecutionPersistence(f.client, userId, clock.now), storage: adapters.createExecutionStorage(f.client) };
   f.engine = overrides => engine.createExecutionEngine({ clock, provider: f.provider,
+    diagnose: event => f.diagnostics.push(structuredClone(event)),
     authorize: async () => { if (!f.authorized) throw new Error("SECRET authorization denial"); return f.session; },
     renderer: { render: args => f.render(args) }, ...overrides });
   return f;

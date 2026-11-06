@@ -372,6 +372,8 @@ test("all execution files are server-only and none registers a route, action, se
     const source = readFileSync(`${root}/lib/execution/${name}.ts`, "utf8");
     assert.match(source, /^import "server-only";/);
     assert.doesNotMatch(source, /["']use server["']|SERVICE_ROLE|\.from\("(?:profiles|prompt_chains|prompt_chain_steps|generation_sets|generations)"\)/);
-    assert.doesNotMatch(source, /console\.(?:log|warn|error)/);
+    // Only the new structured, allowlisted failure event may reach the console.
+    const withoutDiagnostic = name === "engine" ? source.replace('console.warn("[prompt-chain-execution]", event)', "") : source;
+    assert.doesNotMatch(withoutDiagnostic, /console\.(?:log|warn|error)/);
   }
 });

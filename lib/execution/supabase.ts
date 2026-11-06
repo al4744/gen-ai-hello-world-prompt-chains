@@ -18,7 +18,7 @@ export function providerFields(metadata: ProviderMetadata): Record<string, strin
   return result;
 }
 
-export function createExecutionPersistence(client: Client, userId: string): ExecutionPersistence {
+export function createExecutionPersistence(client: Client, userId: string, now: () => number = Date.now): ExecutionPersistence {
   async function rpc(name: "prepare_prompt_chain_run_v1" | "advance_prompt_chain_run_v1", args: Record<string, unknown>, signal: AbortSignal) {
     try {
       const { data, error } = await client.rpc(name, args).abortSignal(signal);
@@ -27,6 +27,26 @@ export function createExecutionPersistence(client: Client, userId: string): Exec
     } catch (error) { throw error instanceof ExecutionFault ? error : new ExecutionFault("persistence_error"); }
   }
   return {
+    async reconcileExpiredRunning(signal) {
+      try {
+        const { data, error } = await client.from("prompt_chain_runs").select("id,creator_id,status,deadline_at")
+          .eq("creator_id", uuid(userId)).eq("status", "running").abortSignal(signal).maybeSingle();
+        if (error) throw new ExecutionFault("persistence_error");
+        if (!data) return;
+        const row = object(data), runId = uuid(row.id);
+        if (uuid(row.creator_id) !== userId || row.status !== "running") throw new ExecutionFault("contract_mismatch");
+        // Local time only selects a candidate. The RPC checks the DB clock,
+        // current creator/superadmin and locks; clock skew can only refuse work.
+        if (timestamp(row.deadline_at) > now()) return;
+        const receipt = await rpc("advance_prompt_chain_run_v1", {
+          p_run_id: runId, p_operation: "expire", p_lease_token: null, p_payload: {},
+        }, signal);
+        // Expiry returns accepted:false with a terminal state. A concurrent
+        // terminal transition is also safe; an ambiguous receipt stops the claim.
+        if (receipt.run_id !== runId || receipt.accepted !== false
+            || !["interrupted", "failed", "succeeded"].includes(status(receipt.status))) throw new ExecutionFault("persistence_error");
+      } catch (error) { throw error instanceof ExecutionFault ? error : new ExecutionFault("persistence_error"); }
+    },
     async prepare(input, signal) {
       const receipt = await rpc("prepare_prompt_chain_run_v1", {
         p_chain_id: uuid(input.chainId), p_idempotency_key: uuid(input.idempotencyKey),

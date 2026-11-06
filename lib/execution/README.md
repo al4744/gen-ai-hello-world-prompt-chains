@@ -91,6 +91,19 @@ previous step transaction before starting the next. A refused claim/start/
 completion stops this invocation without trying to fail another worker's state,
 resuming, repeating a started step, or replaying an AI request.
 
+Before a new claim, the authenticated persistence adapter selects only the current
+creator's stored running run (`id,creator_id,status,deadline_at`). If its deadline
+appears elapsed, it calls the existing `advance_prompt_chain_run_v1` with
+`p_operation: 'expire'`, `p_lease_token: null`, and an empty payload. Ownership is
+checked again locally; the RPC's current-superadmin/creator checks, database clock
+and locks remain authoritative. Only a matching terminal receipt permits the
+new claim. A query/error/ambiguous receipt stops execution; an unexpired run still
+blocks the claim. Clock skew can refuse reconciliation, never extend a lease.
+Concurrent claims remain serialized by the existing RPC and unique index. No
+model, render, upload or finalization is performed for the expired run, and its
+successful steps are retained. No migration, privileged client or GET mutation
+is needed. Recovery for demoted/deleted creators remains separate maintenance.
+
 For `caption-arena-default`, use the RPC-returned composed `prompt` verbatim,
 once. The engine performs no independent concatenation/substitution. It validates
 exactly two distinct, nonempty string captions with keys `caption_a` and
@@ -186,9 +199,13 @@ and the claim-request start also cap the budget, so network latency, remote cloc
 skew, wall-clock rollback or a silently extended RPC cannot buy more execution
 time. The host budget can be configured **downward only**, at most 120 seconds.
 Five seconds are reserved for bounded failure persistence/authoritative readback.
-Provider allocation additionally reserves 30 seconds for final stages and a
-five-second completion write. No new provider starts with less than five seconds
-of request budget. Each I/O/rendering stage is bounded; delayed event-loop timers
+Provider allocation additionally reserves **35 seconds** (7 × the five-second
+I/O ceiling) for authorization, output reload, rendering, PNG validation, upload,
+finalization and confirmation, plus a five-second step completion write. Pre-step
+admission needs **55 seconds**: that final reserve, three I/O allowances for
+authorization/start/completion, and five seconds of minimum provider time. The
+provider allowance is recomputed after authorization/start. No new provider starts
+with less than five seconds of request budget. Each I/O/rendering stage is bounded; delayed event-loop timers
 cannot turn late work into timely work. There is no fire-and-forget continuation.
 
 Five fast free-model calls can fit; five near-20-second calls plus DB/image work
@@ -229,7 +246,20 @@ to another transition. It attempts bounded failure recording and then reads the
 actual run. If writes/reads are unavailable, it returns `unknown`, not a made-up
 failed/succeeded status. Hard process termination, revoked permissions and client
 disconnects can prevent cleanup; the lease/effective-status history and a later
-authorized expiry call remain the recovery mechanism. No automatic resume occurs.
+authorized expiry call remain the recovery mechanism. If attempted cleanup leaves
+the run nonterminal on readback, execution explicitly returns `unknown`. A new
+explicit execution reconciles an expired creator-owned running record before
+claiming its own prepared run. No automatic resume or provider retry occurs.
+
+Caught execution failures emit one structured server warning with only a validated
+run ID (when available), execution stage (including render/validation/upload),
+fixed error code, elapsed/remaining milliseconds, and terminal cleanup confirmation.
+Cleanup is confirmed only by authoritative terminal readback. Diagnostics contain
+no prompts, outputs, image bytes, private paths, raw errors, credentials or lease
+tokens; logging failure cannot interrupt recovery. Offline tests inject a recorder.
+These diagnostics do not identify the original real custom-run failure retroactively:
+renderer, infrastructure or cleanup failure remains possible. A Storage upload
+already in flight can still leave a private orphan; it is never finalized late.
 
 ## Validation and remaining integration
 

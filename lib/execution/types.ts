@@ -2,11 +2,13 @@ import "server-only";
 
 export const EXECUTION_BUCKET = "prompt-chain-execution-media";
 export const EXECUTION_MODEL = "openrouter/free";
+const IO_MS = 5000;
 export const LIMITS = {
   imageBytes: 5_242_880, pixels: 20_000_000, dimension: 8192,
   outputBytes: 32_768, providerBodyBytes: 131_072, contextBytes: 65_536,
   completionTokens: 2000, leaseMs: 120_000, providerMs: 20_000,
-  ioMs: 5000, finalReserveMs: 30_000, cleanupMs: 5000, minProviderMs: 5000,
+  // Reauthorize, reload, render, validate PNG, upload, finalize, confirm.
+  ioMs: IO_MS, finalReserveMs: 7 * IO_MS, cleanupMs: 5000, minProviderMs: 5000,
 } as const;
 
 export type ImageMime = "image/jpeg" | "image/png" | "image/webp";
@@ -55,6 +57,7 @@ export type PrepareMetadata = {
 export interface ExecutionPersistence {
   prepare(input: PrepareMetadata, signal: AbortSignal): Promise<{ runId: string; status: RunStatus }>;
   load(runId: string, signal: AbortSignal): Promise<RunPlan>;
+  reconcileExpiredRunning(signal: AbortSignal): Promise<void>;
   advance(runId: string, command: Command, signal: AbortSignal): Promise<Transition>;
 }
 export interface ExecutionStorage {
@@ -77,4 +80,9 @@ export interface Clock {
 export type ExecutionResult = {
   runId: string; status: RunStatus | "unknown" | "unavailable";
   error?: { code: ErrorCode; message: string };
+};
+
+export type ExecutionDiagnostic = {
+  runId?: string; stage: string; code: ErrorCode; elapsedMs: number; remainingMs: number;
+  cleanup: "not_attempted" | "confirmed" | "unconfirmed";
 };

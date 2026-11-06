@@ -4,7 +4,7 @@ import { imageMime, integer, parseContext, sha, text, uuid, validateOutput } fro
 import { ExecutionFault, fault, publicError } from "./errors";
 import { validateImage } from "./images";
 import { EXECUTION_BUCKET, LIMITS, type ArtifactRenderer, type Clock, type ExecutionProvider,
-  type ExecutionResult, type ExecutionSession, type FailureCode, type ProviderMetadata, type RunPlan, type Transition } from "./types";
+  type ExecutionDiagnostic, type ExecutionResult, type ExecutionSession, type FailureCode, type ProviderMetadata, type RunPlan, type Transition } from "./types";
 
 export type PrepareInput = { chainId: string; idempotencyKey: string;
   image: { mime: string; size: number; sha256: string }; userContext?: string };
@@ -13,7 +13,7 @@ export type PreparationResult = ExecutionResult & { upload?: { bucket: string; p
 /** Internal server factory: authorization is mandatory, never supplied by a browser. */
 export function createExecutionEngine(dependencies: {
   authorize: () => Promise<ExecutionSession>; provider: ExecutionProvider; renderer?: ArtifactRenderer;
-  clock?: Clock; hostBudgetMs?: number;
+  clock?: Clock; hostBudgetMs?: number; diagnose?: (event: ExecutionDiagnostic) => void;
 }) {
   const clock = dependencies.clock ?? systemClock;
   const authorize = async () => {
@@ -48,9 +48,10 @@ export function createExecutionEngine(dependencies: {
   }
 
   async function execute(runId: string, options: { signal?: AbortSignal } = {}): Promise<ExecutionResult> {
+    const started = clock.monotonic();
     const budget = new ExecutionBudget(clock, dependencies.hostBudgetMs);
     let session: ExecutionSession | undefined, plan: RunPlan | undefined, token: string | undefined;
-    let stage: "input" | "claim" | "step" | "provider" | "artifact" | "finalize" = "input";
+    let stage: "input" | "reconcile" | "claim" | "step" | "provider" | "artifact" | "render" | "artifact_validation" | "upload" | "finalize" | "confirm" = "input";
     let providerMetadata: ProviderMetadata | undefined, transitionRefused = false, finalized = false;
     let storedArtifact: { sha256: string; size: number; finalText: string } | undefined;
     const io = <T>(work: (signal: AbortSignal) => Promise<T>, code: "persistence_error" | "input_invalid" | "artifact_error" = "persistence_error") =>
@@ -83,6 +84,8 @@ export function createExecutionEngine(dependencies: {
       const bytes = await io(signal => session!.storage.readInput(plan!, signal), "input_invalid");
       const image = await io(signal => validateImage(bytes, plan!.input, signal), "input_invalid");
       await reauthorize();
+      stage = "reconcile";
+      await io(signal => session!.persistence.reconcileExpiredRunning(signal));
       stage = "claim";
       const claimStarted = clock.monotonic();
       const claim = accepted(await io(signal => session!.persistence.advance(runId,
@@ -117,11 +120,14 @@ export function createExecutionEngine(dependencies: {
       const saved = await io(signal => session!.persistence.load(runId, signal));
       if (saved.status !== "running" || saved.finalText !== previous.at(-1)) throw new ExecutionFault("contract_mismatch");
       const renderMs = Math.min(LIMITS.ioMs, budget.remaining() - 4 * LIMITS.ioMs);
+      stage = "render";
       const rendered = await bounded(clock, renderMs, options.signal, "artifact_error",
         signal => dependencies.renderer!.render({ image, finalText: saved.finalText!, mode: plan!.mode, signal }));
       let artifact;
+      stage = "artifact_validation";
       try { artifact = await io(signal => validateImage(rendered, { mime: "image/png" }, signal), "artifact_error"); }
       catch (error) { if (fault(error).code === "cancelled") throw error; throw new ExecutionFault("artifact_error"); }
+      stage = "upload";
       await io(signal => session!.storage.storeArtifact(plan!, artifact, signal), "artifact_error");
       storedArtifact = { sha256: artifact.sha256, size: artifact.size, finalText: saved.finalText! };
       stage = "finalize";
@@ -129,21 +135,33 @@ export function createExecutionEngine(dependencies: {
         { operation: "finalize", token: token!, payload: { artifact_sha256: artifact.sha256 } }, signal)));
       if (finish.status !== "succeeded") throw new ExecutionFault("contract_mismatch");
       finalized = true;
+      stage = "confirm";
       const confirmed = await io(signal => session!.persistence.load(runId, signal));
       if (confirmed.status !== "succeeded" || confirmed.finalText !== saved.finalText || confirmed.artifactSha256 !== artifact.sha256
           || confirmed.artifactSize !== artifact.size) throw new ExecutionFault("contract_mismatch");
       return result(runId, "succeeded");
     } catch (error) {
-      const failure = fault(error, stage === "artifact" ? "artifact_error" : stage === "provider" ? "provider_error" : "persistence_error");
+      const artifactFailure = ["artifact", "render", "artifact_validation", "upload"].includes(stage);
+      const failure = fault(error, artifactFailure ? "artifact_error" : stage === "provider" ? "provider_error" : "persistence_error");
+      let cleanup: ExecutionDiagnostic["cleanup"] = "not_attempted";
+      const reported = (status: ExecutionResult["status"], recovered = false) => {
+        // Explicit allowlist only: never pass exceptions, prompts, paths or leases.
+        const event: ExecutionDiagnostic = { ...(plan ? { runId: plan.id } : {}), stage, code: failure.code,
+          elapsedMs: Math.max(0, Math.round(clock.monotonic() - started)), remainingMs: Math.max(0, Math.round(budget.remaining())), cleanup };
+        try { (dependencies.diagnose ?? (event => console.warn("[prompt-chain-execution]", event)))(event); }
+        catch { /* Diagnostics must not affect execution or failure recovery. */ }
+        return result(runId, status, recovered ? undefined : failure);
+      };
       // Never fail another worker's claim, retry a provider, repeat a refused
       // transition, or pretend an unsuccessful cleanup persisted a failed state.
       if (session && plan && plan.creatorId === session.userId && !transitionRefused && !finalized) {
-        const code: FailureCode = stage === "artifact" ? "artifact_error"
+        const code: FailureCode = artifactFailure ? "artifact_error"
           : failure.code === "cancelled" || failure.code === "deadline_exceeded" ? "provider_timeout"
           : ["input_invalid", "provider_error", "provider_timeout", "output_invalid"].includes(failure.code)
             ? failure.code as FailureCode : "persistence_error";
         const canFailPrepared = !token && plan.status === "prepared" && stage === "input" && failure.code === "input_invalid";
         if (token || canFailPrepared) {
+          cleanup = "unconfirmed";
           try {
             await bounded(clock, LIMITS.cleanupMs / 2, undefined, "persistence_error", signal => session!.persistence.advance(runId,
               { operation: "fail", ...(token ? { token } : {}), payload: { error_code: code,
@@ -154,12 +172,13 @@ export function createExecutionEngine(dependencies: {
       if (session && plan && plan.creatorId === session.userId) {
         try {
           const current = await bounded(clock, LIMITS.cleanupMs / 2, undefined, "persistence_error", signal => session!.persistence.load(runId, signal));
+          if (cleanup === "unconfirmed" && ["succeeded", "failed", "interrupted"].includes(current.status)) cleanup = "confirmed";
           if (stage === "finalize" && storedArtifact && current.status === "succeeded" && current.artifactSha256 === storedArtifact.sha256
-              && current.artifactSize === storedArtifact.size && current.finalText === storedArtifact.finalText) return result(runId, "succeeded");
-          return result(runId, current.status === "succeeded" && failure.code === "contract_mismatch" ? "unknown" : current.status, failure);
+              && current.artifactSize === storedArtifact.size && current.finalText === storedArtifact.finalText) return reported("succeeded", true);
+          return reported(cleanup === "unconfirmed" || (current.status === "succeeded" && failure.code === "contract_mismatch") ? "unknown" : current.status);
         } catch { /* Never claim failed/succeeded without persisted confirmation. */ }
       }
-      return result(runId, failure.code === "access_denied" ? "unavailable" : "unknown", failure);
+      return reported(failure.code === "access_denied" ? "unavailable" : "unknown");
     }
   }
   return { prepare, execute };
