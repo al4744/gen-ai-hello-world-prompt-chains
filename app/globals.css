@@ -1,26 +1,264 @@
 @import "tailwindcss";
 
+/* Dark is the default without a saved preference. The early head script sets
+   data-theme before paint; system stays a mode so CSS reacts to OS changes. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --muted: #a1a1aa;
+  --surface: #111113;
+  --panel: #0d0d0f;
+  --border: #303033;
+  --input: #18181b;
+  --control-border: #71717a;
+  --primary: #ffffff;
+  --primary-foreground: #09090b;
+  --primary-hover: #e5e7eb;
+  --secondary-hover: #202023;
+  --focus: #d4d4d8;
+  --destructive: #fca5a5;
+  --destructive-surface: #251417;
+  --destructive-border: #623039;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-foreground: #ffffff;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #fafafa;
+  --foreground: #18181b;
+  --muted: #52525b;
+  --surface: #ffffff;
+  --panel: #f4f4f5;
+  --border: #d4d4d8;
+  --input: #ffffff;
+  --control-border: #71717a;
+  --primary: #18181b;
+  --primary-foreground: #ffffff;
+  --primary-hover: #3f3f46;
+  --secondary-hover: #e4e4e7;
+  --focus: #52525b;
+  --destructive: #991b1b;
+  --destructive-surface: #fef2f2;
+  --destructive-border: #fecaca;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    color-scheme: light;
+    --background: #fafafa;
+    --foreground: #18181b;
+    --muted: #52525b;
+    --surface: #ffffff;
+    --panel: #f4f4f5;
+    --border: #d4d4d8;
+    --input: #ffffff;
+    --control-border: #71717a;
+    --primary: #18181b;
+    --primary-foreground: #ffffff;
+    --primary-hover: #3f3f46;
+    --secondary-hover: #e4e4e7;
+    --focus: #52525b;
+    --destructive: #991b1b;
+    --destructive-surface: #fef2f2;
+    --destructive-border: #fecaca;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-panel: var(--panel);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-control-border: var(--control-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
+  margin: 0;
   background: var(--background);
   color: var(--foreground);
+  /* Match the existing Admin body's typography; retain its Geist font setup. */
   font-family: Arial, Helvetica, sans-serif;
+}
+
+button, a, select { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled), a { cursor: pointer; }
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+
+.brand-link { border-radius: 0.25rem; }
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.button-primary, .button-secondary, .button-danger, .button-danger-secondary {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  text-decoration: none;
+  transition: background-color 150ms, border-color 150ms, color 150ms;
+}
+
+.button-primary { background: var(--primary); color: var(--primary-foreground); font-weight: 600; }
+.button-secondary { border-color: var(--border); background: transparent; color: var(--foreground); }
+.button-danger { background: var(--danger); color: var(--danger-foreground); font-weight: 600; }
+.button-danger-secondary { border-color: var(--destructive-border); color: var(--destructive); }
+
+.form-input {
+  min-height: 2.75rem;
+  border: 1px solid var(--control-border);
+  border-radius: 0.75rem;
+  background: var(--input);
+  padding: 0.625rem 0.875rem;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+textarea.form-input { resize: vertical; }
+.form-input[aria-invalid="true"] { border-color: var(--destructive); }
+.form-field-error { color: var(--destructive); }
+.feedback-success { border: 1px solid var(--border); border-radius: 0.75rem; background: var(--panel); padding: 0.75rem 1rem; font-size: 0.875rem; }
+.chain-directory-row + .chain-directory-row { border-top: 1px solid var(--border); }
+.text-link { text-decoration: underline; text-decoration-color: var(--control-border); text-underline-offset: 0.25rem; }
+
+.navigation-link {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: 0.75rem;
+  padding: 0.625rem 1rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 150ms, color 150ms;
+}
+
+.navigation-link[aria-current="page"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.theme-switcher {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 2.5rem);
+  gap: 0.125rem;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  background: var(--input);
+  padding: 0.25rem;
+  vertical-align: middle;
+}
+
+.theme-option {
+  position: relative;
+  cursor: pointer;
+}
+
+.theme-option-icon {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  color: var(--muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+.theme-option input:checked + .theme-option-icon {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.theme-option input:focus-visible + .theme-option-icon {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (width < 48rem) {
+  .theme-switcher {
+    grid-template-columns: repeat(3, 2.25rem);
+    gap: 0;
+    border-radius: 0.75rem;
+    padding: 0.1875rem;
+  }
+  .theme-option-icon { min-height: 2.25rem; }
+}
+
+@media (hover: hover) {
+  .button-primary:hover:not(:disabled) { background: var(--primary-hover); }
+  .button-secondary:hover:not(:disabled) { background: var(--secondary-hover); }
+  .button-danger:hover:not(:disabled) { background: var(--danger-hover); }
+  .button-danger-secondary:hover { background: var(--destructive-surface); }
+  .text-link:hover { text-decoration-color: currentColor; }
+  .navigation-link:hover { background: var(--secondary-hover); color: var(--foreground); }
+  .navigation-link[aria-current="page"]:hover { background: var(--primary-hover); color: var(--primary-foreground); }
+  .theme-option:hover .theme-option-icon { background: var(--secondary-hover); color: var(--foreground); }
+  .theme-option:hover input:checked + .theme-option-icon { background: var(--primary-hover); color: var(--primary-foreground); }
+}
+
+button:disabled { cursor: wait; opacity: 0.6; }
+
+.feedback-error {
+  border: 1px solid var(--destructive-border);
+  border-radius: 0.75rem;
+  background: var(--destructive-surface);
+  padding: 0.75rem;
+  color: var(--destructive);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.loading-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+.skip-link {
+  position: fixed;
+  top: -6rem;
+  left: 1rem;
+  z-index: 50;
+  border-radius: 0.5rem;
+  background: var(--primary);
+  padding: 0.75rem 1rem;
+  color: var(--primary-foreground);
+}
+.skip-link:focus { top: 1rem; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

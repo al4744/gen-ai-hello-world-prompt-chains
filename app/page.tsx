@@ -1,69 +1,51 @@
-import Image from "next/image";
+import { connection } from "next/server";
+import { redirect } from "next/navigation";
+import { getAccessState } from "@/lib/auth/require-superadmin";
+import { AuthShell } from "@/components/app-shell";
+import GoogleSignIn from "@/components/google-sign-in";
+import SignOutButton from "@/components/sign-out-button";
 
-export default function Home() {
+export const instant = false;
+
+type HomePageProps = {
+  searchParams: Promise<{ auth_error?: string }>;
+};
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  await connection();
+  const access = await getAccessState();
+  if (access.status === "authorized") redirect("/dashboard");
+
+  const { auth_error } = await searchParams;
+  const denied = access.status === "denied";
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <AuthShell>
+      <section aria-labelledby="auth-title" className="w-full max-w-md rounded-2xl border border-border bg-surface p-6">
+        <p className="eyebrow">Superadmin workspace</p>
+        <h1 id="auth-title" className="mt-3 text-2xl font-bold tracking-tight">Prompt Chain Tool</h1>
+
+        {denied ? (
+          <div className="mt-5 space-y-4">
+            <div className="feedback-error" role="alert">
+              <h2 className="font-semibold">Access denied</h2>
+              <p className="mt-2 leading-6">An authorized Google account with superadmin access is required to use this tool.</p>
+            </div>
+            <p className="text-sm leading-6 text-muted">Sign out to continue with a different account.</p>
+            <SignOutButton />
+          </div>
+        ) : (
+          <>
+            <p className="mt-3 text-sm leading-6 text-muted">A dedicated workspace for managing the prompt chains behind Caption Arena.</p>
+            <p className="mt-3 text-sm leading-6 text-muted">Sign in with your authorized Google account to continue.</p>
+            {auth_error === "authentication_failed" && (
+              <p role="alert" className="feedback-error mt-5">Sign-in could not be completed. The link may have expired. Please try again.</p>
+            )}
+            <div className="mt-6"><GoogleSignIn /></div>
+            <p className="mt-4 text-xs leading-5 text-muted">Access is limited to approved superadmins.</p>
+          </>
+        )}
+      </section>
+    </AuthShell>
   );
 }
