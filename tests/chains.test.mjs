@@ -21,6 +21,7 @@ function load(path, imports = {}) {
 }
 
 const model = load("lib/chains/model.ts");
+const stepModel = load("lib/steps/model.ts", { "@/lib/chains/model": model });
 const validation = load("lib/chains/validation.ts", { "./model": model });
 const systemId = "11111111-1111-4111-8111-111111111111";
 const customId = "22222222-2222-4222-8222-222222222222";
@@ -100,6 +101,9 @@ function fixture(options = {}) {
       "@/lib/auth/require-superadmin": guard, "@/lib/chains/data": data, "@/lib/chains/model": model, "@/lib/chains/validation": validation,
       "@/components/chains/chain-ui": { ChainPage: "chain-page", ChainReadError: "read-error", SystemBadge: "system-badge", SystemChainNotice: "system-notice", BackToChains: "back-link" },
       "@/components/chains/chain-form": { default: "chain-form" }, "@/components/chains/delete-chain-form": { default: "delete-form" },
+      "@/lib/steps/model": stepModel, "@/components/steps/step-move-controls": { default: "step-move-controls" },
+      "@/components/steps/step-reorder-list": { default: "step-reorder-list" },
+      "@/components/chains/chain-success-notice": { default: "chain-success-notice" },
       "../actions": actions, "../../actions": actions,
     }).default;
   }
@@ -303,6 +307,22 @@ test("detail reads existing steps in order without mutating them", async () => {
   const rendered = JSON.stringify(await f.page("[id]/page.tsx")(pageProps));
   assert.match(rendered, /First prompt/); assert.match(rendered, /Second prompt/);
   assert.ok(rendered.indexOf("First prompt") < rendered.indexOf("Second prompt"));
+  assert.equal(writes(f.calls).length, 0);
+});
+
+test("detail hands each redirect confirmation to the one-time notice, with no notice on refresh", async () => {
+  const f = fixture();
+  for (const [flag, message] of [
+    ["created", "Prompt chain created."], ["updated", "Changes saved."],
+    ["step_created", "Step added."], ["step_updated", "Step changes saved."],
+    ["step_deleted", "Step deleted. Remaining positions updated."],
+    [null, null], ["unrelated", null],
+  ]) {
+    const tree = await f.page("[id]/page.tsx")({ ...pageProps, searchParams: Promise.resolve(flag ? { [flag]: "1" } : {}) });
+    const notice = elements(tree).find(node => node.type === "chain-success-notice");
+    assert.equal(notice.props.message, message);
+    assert.equal(elements(tree).filter(node => node.props?.role === "status").length, 0);
+  }
   assert.equal(writes(f.calls).length, 0);
 });
 

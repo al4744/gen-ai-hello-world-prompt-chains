@@ -1,6 +1,6 @@
 # Prompt Chain Tool
 
-The standalone Week 8 Caption Arena superadmin application, with Google OAuth, session management, theme support, and prompt-chain metadata CRUD. Stored steps can be inspected read-only. Step editing, execution, and generation history remain for later milestones.
+The standalone Week 8 Caption Arena superadmin application, with Google OAuth, session management, themes, chain/step CRUD, and custom-chain step reordering. The v1 CRUD/arrow RPC is installed and live verified by the user. Drag-to-position saves require the separate, unapplied v2 migration in `supabase/DRAG_REORDERING.md`. Execution and generation history remain out of scope.
 
 Run `npm run dev -- --port 3002`, then visit `http://localhost:3002`.
 
@@ -30,11 +30,11 @@ The authenticated application includes a compact segmented theme switcher: Sun (
 
 - `/chains` lists chains in pages of 50, with metadata, creation dates in UTC, and related step counts where available. The directory includes the original default chain.
 - `/chains/new` creates only the name, slug, and description. The database generates the UUID and timestamp; no steps or mix entries are created.
-- `/chains/[id]` displays metadata and ordered stored steps in expandable read-only sections. `/edit` and `/delete` are available for custom chains.
+- `/chains/[id]` displays metadata and ordered stored steps with previews and expandable full templates. Custom chains have Add step, Edit, Delete, and a narrow left rail with up/down chevrons and a six-dot drag handle. The default chain remains read-only. Chain `/edit` and `/delete` pages are preserved.
 - Every page and Server Action independently calls `requireSuperadmin()`. Reads and writes use its authenticated Supabase client, preserving RLS and column privileges. No chain data is publicly cached and no mutation runs on GET.
 - `caption-arena-default` is reserved and read-only. Actions fetch the current record by UUID and reject edits/deletion of the default chain. UPDATE and DELETE also exclude its slug in the mutation query itself. Custom chains cannot be assigned the reserved slug.
 - Edit and delete forms carry an original-metadata snapshot. Actions compare it against current data and filter the write by UUID plus original name/slug/description. Concurrent metadata changes produce inline feedback rather than silently overwriting data. Reopen the form to review the latest version; no schema or version column is added.
-- Delete first opens a confirmation page. Cancel only navigates. Final confirmation deletes one custom parent row; the existing database foreign keys cascade to its steps and mix entry. The application issues no child-table, media, or generation writes.
+- Chain deletion first opens a confirmation page. Cancel only navigates. Final confirmation deletes one custom parent row; the existing database foreign keys cascade to its steps and mix entry. Chain CRUD issues no direct child-table, media, or generation writes.
 - Forms retain submitted text on validation failure, suppress repeated submissions, and disable submit controls while pending. Duplicate slugs, query failures, permission failures, and missing records produce safe feedback without exposing database errors. Successful writes revalidate chain pages and redirect to fixed internal destinations.
 
 ### Validation limits and schema verification
@@ -53,6 +53,13 @@ where table_schema = 'public' and table_name = 'prompt_chains';
 
 These queries are read-only. Do not change schemas, RLS, privileges, or the default chain to perform verification.
 
+## Custom-chain step management
+
+- Add/edit routes are `/chains/[id]/steps/new` and `/chains/[id]/steps/[stepId]/edit`. Step deletion uses a dedicated `/delete` confirmation page identifying name, position, and parent. Cancel is navigation only.
+- Every step page and action independently calls `requireSuperadmin()`, validates UUIDs, verifies the parent and ownership, and rejects the system chain. Forms preserve input, validate nonempty name/template, suppress duplicate submission, and disable pending controls. Literal template whitespace is retained; no execution or interpolation occurs.
+- Step CRUD and adjacent arrow moves keep using one installed `manage_prompt_chain_steps_v1` RPC per operation. Arbitrary drops use one additive `reorder_prompt_chain_step_v2` call; until v2 is manually installed, drag saves report its absence while arrows remain usable. Hover, canceled drags, and no-op drops never save. No direct-update or repeated-arrow fallback exists.
+- The v1 schema/permissions are documented in [`supabase/README.md`](supabase/README.md); the drag UI, additive migration, preflight checks, rollback, and validation limits are in [`supabase/DRAG_REORDERING.md`](supabase/DRAG_REORDERING.md). Do not apply migrations automatically.
+
 ## Local checks
 
 ```bash
@@ -62,11 +69,13 @@ npm run build
 node --test tests/auth.test.mjs
 node --test tests/theme.test.mjs
 node --test tests/chains.test.mjs
+node --test tests/steps.test.mjs
+node --test tests/reordering.test.mjs
 git diff --check
 git status --short
 ```
 
-The Node tests transpile actual modules with isolated SDK/framework boundaries. They do not read environment files, contact Supabase, or modify database records. They cover authentication, theme persistence, protected pages, CRUD validation, parent-only mutations, default protection, stale updates/deletions, expected database failures, form state, and confirmation behavior. Mock tests do not verify the live RLS policies or foreign-key cascades.
+The Node tests transpile actual modules with isolated SDK/framework boundaries. They do not read environment files, contact Supabase, or modify database records. They cover authentication, themes, chain CRUD, step Server Actions, forms and ordered UI. Step rollback/concurrency tests use a clearly labeled behavioral transaction model; they do not execute the unapplied SQL function or establish PostgreSQL/RLS integration behavior.
 
 ## Manual browser verification
 
@@ -81,8 +90,9 @@ The Node tests transpile actual modules with isolated SDK/framework boundaries. 
 9. Tab into the theme switcher and use arrow keys to select each option. Reload with a saved Light preference to check for a theme flash or hydration warnings. Select System default and change the OS appearance while the page is open; both directions should update immediately. Explicit Dark/Light must stay fixed when the OS changes.
 10. Verify the preference persists through sign-out and a new login, synchronizes between tabs, and uses Dark for a fresh browser origin. Check the storage-blocked feedback and both themes' login, access-denied, button, and focus states.
 
-11. As a superadmin, browse `/chains`, including the default-chain badge, descriptions, dates, step counts, pagination, and read-only step details. Check both themes at mobile and desktop sizes.
+11. As a superadmin, browse `/chains`, including the default-chain badge, descriptions, dates, step counts, pagination, and step details. Check all themes at mobile and desktop sizes.
 12. Using a disposable custom test chain, create it, test invalid/duplicate slugs, edit metadata, inspect that its steps are unchanged, cancel deletion, then confirm deletion. Check success feedback, preserved entries, keyboard focus, and pending states. No live CRUD test is run automatically.
 13. Open edit/confirmation forms in two tabs, change metadata in one, and confirm that the stale form refuses to overwrite/delete. Direct visits to the default chain's edit/delete pages must show a read-only notice.
+14. Before v2 is installed, confirm drag saves report the missing update and leave order unchanged while arrows still work. After manual review/installation in an isolated test environment, check arbitrary moves, refresh persistence, v1/v2 concurrency, stale snapshots, default protection, and rollback using `supabase/DRAG_REORDERING.md`.
 
 Live Google OAuth and database policy enforcement require real browser sessions and configuration verification; isolated tests do not establish those outcomes.
