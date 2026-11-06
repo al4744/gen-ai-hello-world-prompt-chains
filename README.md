@@ -1,6 +1,8 @@
 # Prompt Chain Tool
 
-The standalone Week 8 Caption Arena superadmin application, with Google OAuth, session management, themes, chain/step CRUD, and custom-chain step reordering. The v1 CRUD/arrow RPC is installed and live verified by the user. Drag-to-position saves require the separate, unapplied v2 migration in `supabase/DRAG_REORDERING.md`. Execution and generation history remain out of scope.
+The standalone Week 8 Caption Arena superadmin application, with Google OAuth, session management, themes, chain/step CRUD, custom-chain step reordering, and a server-only execution core. The user confirmed installation of the step-management RPCs, execution migrations 003/004, and private execution bucket. Generation entry points, the real artifact renderer, browser UI, and history pages remain future integration work.
+
+See [the Step 7D.1 execution core](lib/execution/README.md) for module contracts, mocked validation, renderer requirements, deadline protections, and installed-persistence limitations. No real AI call or media upload was made during implementation.
 
 Run `npm run dev -- --port 3002`, then visit `http://localhost:3002`.
 
@@ -71,6 +73,9 @@ node --test tests/theme.test.mjs
 node --test tests/chains.test.mjs
 node --test tests/steps.test.mjs
 node --test tests/reordering.test.mjs
+node --test tests/notifications.test.mjs
+node --test tests/execution-persistence.test.mjs
+node --test tests/execution-core.test.mjs
 git diff --check
 git status --short
 ```

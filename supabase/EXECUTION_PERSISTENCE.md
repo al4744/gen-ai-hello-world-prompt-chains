@@ -1,6 +1,9 @@
 # Step 7C.1 — execution persistence proposal
 
-**Prepared locally; not installed, executed, or connected to an AI provider.**
+**Historical Step 7C.1 record:** prepared locally without installation or AI calls.
+For Step 7D.1, the user confirmed migrations 003/004 and the private bucket were
+manually installed. See [the execution core](../lib/execution/README.md) for current
+implementation and mocked validation; this session did not execute SQL.
 Checkpoint inspected: `fcd8a24`, initially clean. This step changes no application
 runtime, existing migration, dependency, environment file, or Supabase resource.
 The SQL is a reviewable design, not a claim of live database compatibility.
