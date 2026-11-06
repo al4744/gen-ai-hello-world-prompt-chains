@@ -4,14 +4,114 @@ These Node Route Handlers use the existing session client and execution core.
 The existing Cache Components configuration requires Node.js; this Next version
 forbids explicit route `runtime` exports, including `runtime = 'nodejs'`.
 Step 7F.1 integrates a real [renderer](../execution/RENDERER.md) behind a default-off
-server-only safety flag. No page, gallery, privileged credential, SQL or
-Storage-policy change is included. No live mutation, upload or AI request was used.
+server-only safety flag. Step 7F.8 adds the protected Generate page and completed
+PNG retrieval below. No history gallery, privileged credential, SQL or Storage
+policy change is included. No live mutation, upload or AI request was used.
 
 | Method and route | Request | Successful response |
 |---|---|---|
 | `POST /api/generation/runs` | `{ chainId, idempotencyKey, image: { mime, size, sha256 }, userContext? }` | `{ runId, status, upload?: { bucket, path, contentType } }` |
 | `POST /api/generation/runs/:runId/execute` | `{}` | `{ runId, status, error?: { code, message } }` |
 | `GET /api/generation/runs/:runId` | No body | `{ runId, chain: { id, name, slug }, status, progress, createdAt, startedAt, completedAt, error?, finalText? }` |
+| `GET /api/generation/runs/:runId/media` | Optional `?download=1` | Verified PNG; inline preview or attachment |
+
+## Generate page — Step 7F.8
+
+`/generate` sits under the existing protected layout, independently calls
+`requireSuperadmin()` before loading data/readiness, and is item 03 in the shared
+sidebar/mobile navigation. Its compact header, two responsive panels, buttons,
+form controls and semantic colours reuse the Prompt Chain Tool design system.
+No global CSS or theme logic changed. Public Generate's prominent upload,
+original preview, captions/results and Create another flow informed the UX;
+both reference applications were inspected read-only. Generation is explicitly
+submitted after choosing a chain/context instead of starting on file selection.
+
+The server reuses `listChains` across all directory pages, supplying names,
+descriptions and step counts without prompt templates. The system chain is the
+sensible default when executable; custom chains are equally selectable. Empty
+or unsupported step configurations remain inspectable but cannot be submitted.
+Preparation still snapshots/validates the authoritative definition in the RPC.
+
+The client receives only a non-sensitive server readiness boolean. While false,
+chain selection, optional context and local image preview work, but the primary
+action and workflow guard prevent hashing/preparation/upload/execution. No real
+flag or credential is set by the UI, tests or build. Existing backend execution
+and production-factory gates remain unchanged, including if the UI is bypassed.
+As before, the metadata preparation endpoint itself is not disabled by this flag;
+its existing contract is preserved. A stale enabled page encountering a disabled
+backend shows configuration unavailable and prevents further submissions.
+
+`workflow.ts` coordinates existing endpoints and `uploadPreparedInput`, not a
+second execution engine. A synchronous lock prevents duplicate clicks before a
+React paint. It validates the selected chain/file/context, computes SHA256 using
+Web Crypto, prepares with a UUID idempotency key, uploads original bytes through
+the existing helper, executes once, then reads authoritative persisted status.
+Ambiguous preparation retains its key for an explicit identical submission;
+changed inputs get a new key. An acknowledged preparation followed by a failed
+upload can be replaced by a new intentional run, never an overwrite.
+The browser bounds its upload wait to 60 seconds and stops on unmount. The
+existing Storage SDK helper cannot cancel an already-started upload; a late
+private object may remain, but its acknowledgement never triggers execution
+after cancellation/timeout. Cleanup/retention remains separately approved work.
+
+Loading messages distinguish image checking, preparation, secure upload,
+execution and status/media loading. Because execution is request-bound, the client
+awaits that single POST. After two seconds, a bounded read-only observer displays
+persisted step progress while that request is pending and is cancelled with its
+acknowledgement. Recovery/active-run polling is also read-only; each observer is
+limited to 60 reads / a 150-second window, with two-second gaps and bounded
+individual requests. A lost execution response only triggers status reads, never
+automatic execution replay. Failed/interrupted statuses and saved step counts
+come from the database; configuration unavailable is distinct from a failed run.
+
+The acknowledged run UUID is kept in `/generate?run=...` for refresh recovery.
+Only this identifier is persisted in the URL; no input image, context, upload
+descriptor, provider metadata, lease, or credential is stored in browser storage.
+Refresh reauthorizes the page and resumes read-only status/media retrieval,
+including while generation is disabled. Unknown/running work blocks another
+submission until its status is checked. Prepared work is never automatically
+re-executed; an explicit Start a new run begins a different intention.
+
+`preview.ts` checks MIME, size and image signature before creating a local object
+URL, then waits for browser decoding and checks dimension/pixel bounds. Failed,
+cancelled and replaced selections cannot publish a broken preview. Object URLs
+are revoked on failure, replacement, reset and unmount. Existing server byte
+validation before claim is still authoritative. Context allows up to 500 Unicode
+characters / 2,000 UTF-8 bytes and stays intact when changing chains.
+
+Only confirmed successful status exposes generated text and loads media. Default
+caption JSON is shown as Caption A/B with the exact saved JSON available in a
+disclosure; custom output stays literal text. React escapes all output. Completed
+PNGs are fetched through the new guarded media route and previewed with temporary
+blob URLs. Next Image uses `unoptimized` so private images never enter its public
+optimization/cache path. Downloads reauthorize through the same endpoint with
+`?download=1`. Media-load failure preserves the successful run/text and retries
+only the image GET. Controls have labels, visible global focus indicators and
+live status/error feedback; motion follows the existing reduced-motion rule.
+
+## Completed PNG retrieval
+
+`media.ts` independently verifies the current Google superadmin on every request,
+then validates the UUID and selects only the saved status, creator snapshot,
+artifact path, length and SHA256. A successful record is required. The path must
+equal `<creator snapshot UUID>/<run UUID>/captioned.png`; no query-supplied path,
+URL, bucket or filename is trusted. Current-superadmin history scope permits
+reading other creators' completed artifacts and retained deleted-chain history.
+
+The existing session client downloads only from the fixed private bucket using
+RLS and `no-store`. Streaming stops at the recorded size or 5 MiB; independent
+Sharp validation confirms PNG signature/full decode, dimensions/pixels, exact
+length and saved digest before any bytes are returned. A ten-second overall
+bound and request AbortSignal cover querying/downloading/validation. No upload,
+RPC, mutation, signed URL, public bucket or privileged client is involved.
+
+Success sets `Content-Type: image/png`, exact Content-Length, a UUID-only fixed
+Content-Disposition filename, `Cache-Control: private, no-store`, `Vary: Cookie`,
+`X-Content-Type-Options: nosniff`, and restrictive image-response CSP. Anonymous
+and ordinary users get 401/403; invalid IDs 400; absent runs/objects 404;
+unfinished runs 409; invalid artifacts 422; unavailable persistence/transport 503.
+Errors use fixed sanitized JSON and private/no-store headers, never paths or
+diagnostics. Status/media remain readable while the generation flag is off.
 
 IDs are UUIDs, SHA256 is 64 lowercase hexadecimal characters, size is an integer
 from 1 through 5,242,880 bytes, and MIME is JPEG/PNG/WebP. Optional context is at
@@ -115,8 +215,16 @@ timeouts, provider response validation and sanitized results.
 
 Before actual generation: approve live testing and the exact server flag, quota and
 provider-spending controls, confirm host duration and server-only provider
-configuration, and perform approved browser/RLS integration tests. Then add the
-generation UI, safe media retrieval and chain-specific history. Direct RPCs remain
+configuration, and perform approved browser/RLS integration tests. Chain-specific
+history/gallery is Step 7G; this page only recovers the current run. Direct RPCs remain
 callable by an authorized creator under the installed model: server-only AI
 provenance is not attested by this HTTP layer. Orphan cleanup/retention remains
 separate work. No new permission or service identity is introduced here.
+
+`tests/generate-page.test.mjs`, `tests/generation-workflow.test.mjs` and
+`tests/generation-media.test.mjs` cover guarded page/endpoint access, multi-page
+chain selection, disabled SSR controls, local previews, actual hashing and upload
+helper integration, duplicate prevention, idempotency, status/recovery/failures,
+object URL cleanup and PNG verification. All fetch/Supabase/Storage boundaries
+are mocked. Browser layout, actual drag/drop/decoding, keyboard/screen-reader
+interaction and real RLS compatibility still need manual approved validation.

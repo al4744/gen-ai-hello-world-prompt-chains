@@ -244,8 +244,9 @@ matches this source; future isolated/user-approved integration must check that.
   routes, CSRF and JSON limits, and duration settings are implemented separately.
   Request quotas and server credential configuration remain pre-generation work.
   Do not send client tokens, snapshots or provider results.
-- **7F.1:** the real renderer is implemented and integrated behind the default-off
-  flag. Browser generation UI and approved live integration remain future work.
+- **7F:** the real renderer, protected Generate page and completed PNG retrieval
+  are implemented behind the default-off flag. Approved live integration remains
+  future work; see [the generation workflow](../generation/README.md).
 - **7G:** guarded history/media retrieval, chain-specific filtering, expired/
   failed/unknown feedback, retained deleted-chain snapshots, responsive themes.
 

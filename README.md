@@ -1,6 +1,6 @@
 # Prompt Chain Tool
 
-The standalone Week 8 Caption Arena superadmin application, with Google OAuth, session management, themes, chain/step CRUD, custom-chain step reordering, a server-only execution core, protected generation endpoints, and a production captioned-image renderer. The user confirmed installation of the step-management RPCs, execution migrations 003/004, and private execution bucket. Browser generation UI and history pages remain future integration work.
+The standalone Week 8 Caption Arena superadmin application, with Google OAuth, session management, themes, chain/step CRUD, custom-chain step reordering, a server-only execution core, protected generation endpoints, and a production captioned-image renderer. The protected `/generate` page now connects those pieces and retrieves completed private PNGs securely. The user confirmed installation of the step-management RPCs, execution migrations 003/004, and private execution bucket. The full history gallery remains Step 7G work.
 
 See [the Step 7D.1 execution core](lib/execution/README.md) for module contracts, mocked validation, renderer requirements, deadline protections, and installed-persistence limitations. No real AI call or media upload was made during implementation.
 
@@ -80,6 +80,7 @@ node --test tests/execution-persistence.test.mjs
 node --test tests/execution-core.test.mjs
 node --test tests/generation.test.mjs
 node --test tests/renderer.test.mjs
+node --test tests/generate-page.test.mjs tests/generation-workflow.test.mjs tests/generation-media.test.mjs
 git diff --check
 git status --short
 ```

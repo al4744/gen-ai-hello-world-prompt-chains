@@ -113,8 +113,8 @@ Vercel/Linux runtime behavior and writable `/tmp` still need deployment validati
 the production output-file trace is checked separately for both bundled assets.
 
 No real AI request, live Storage upload, SQL or Supabase change was performed.
-Browser generation forms, media retrieval and history gallery remain future
-work. Before approved live testing, review quotas/spending, host duration/native
+Step 7F.8 adds [the protected Generate page and media retrieval](../generation/README.md);
+the full history gallery remains future work. Before approved live testing, review quotas/spending, host duration/native
 font bundle, and installed RLS/RPC compatibility. The existing staged-artifact
 read restriction, possible private orphan after interrupted upload, and lack of
 server-only AI-provenance attestation in the creator-JWT RPC model remain unchanged.
