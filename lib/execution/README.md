@@ -6,8 +6,9 @@ installed manually. This implementation session executes no SQL, contacts no AI
 provider, uploads no media, and reads no real AI credential. Tests use synthetic
 credentials, mock fetch/Supabase/Storage/renderers and in-memory image fixtures.
 
-The core itself registers **no generation routes, Server Actions, browser UI,
-history pages or production artifact renderer**. Step 7E.1 now adds separate
+The core itself registers **no generation routes, Server Actions, browser UI or
+history pages**. Step 7F.1 adds an injected [production PNG renderer](RENDERER.md)
+with live execution disabled by a server-only feature flag. Step 7E.1 adds separate
 [protected generation routes and an upload helper](../generation/README.md).
 Importing the core starts no work. Every module is `server-only`; use Node.js,
 not Edge, for Sharp/crypto. No Supabase client or SQL migration is replaced.
@@ -21,6 +22,8 @@ not Edge, for Sharp/crypto. No Supabase client or SQL migration is replaced.
 | `types.ts` | DI interfaces, internal contracts, immutable free-model/bucket constants, explicit limits |
 | `contracts.ts` | Runtime validation of database plans, paths, snapshots, returned contexts and final text |
 | `images.ts` | Signature checks, full Sharp decode, dimensions/pixels, MIME/size/digest verification |
+| `renderer.ts` | Bounded caption panels, bundled font, escaped text and real PNG composition |
+| `enabled.ts` | Deferred exact-match server-only generation safety flag |
 | `openrouter.ts` | Fixed chat-completions endpoint, multimodal encoding, response limits, metadata and safe errors |
 | `supabase.ts` | Exact v1 RPC arguments/whitelisted metadata and private Storage adapter |
 | `budget.ts` | Cancellable bounded I/O, monotonic host/lease budgets and bounded stream reads |
@@ -33,8 +36,8 @@ declaration makes successful native decoding a required runtime capability.
 ## Entry and upload contract for Step 7E
 
 The following contract is now wired by Step 7E.1; see the endpoint documentation
-above for JSON/origin limits and the browser upload helper. Renderer integration
-and request quotas still precede enabling real generation.
+above for JSON/origin limits and the browser upload helper. The production
+renderer is integrated; the feature flag and quota review precede live testing.
 
 The authenticated POST handlers independently invoke the guard,
 then construct `createServerExecutionEngine({ renderer, hostBudgetMs })` inside
@@ -149,12 +152,12 @@ References: [OpenRouter chat API](https://openrouter.ai/docs/api/api-reference/c
 ## Artifact renderer and installed Storage constraint
 
 The injected `ArtifactRenderer.render({ image, finalText, mode, signal })` returns
-PNG bytes. It receives the exact persisted final text and no token/key. Step 7F
-must supply a real renderer, decide the layout for two default captions and
-custom outputs, escape all generated text, prohibit external renderer resources,
-and honor cancellation/byte/pixel/time limits. The current default factory has
-**no renderer** and returns `prepared` plus `renderer_unavailable` before any AI
-call. It never creates a dummy success artifact. PNG fixtures exist only in tests.
+PNG bytes. It receives the exact persisted final text and no token/key. The
+production factory now injects the real Sharp renderer; [its layout, normalization,
+font coverage and bounds](RENDERER.md) are documented separately. The endpoint
+returns `generation_disabled` before any run load, claim, Storage or AI work unless
+the server-only flag is exactly `true`. The factory independently checks the flag
+before provider configuration/input download/claim. No dummy artifact is used.
 
 After all model results persist, the core independently validates rendered PNG
 bytes and computes their digest, then uploads those exact bytes with fixed path,
@@ -241,9 +244,8 @@ matches this source; future isolated/user-approved integration must check that.
   routes, CSRF and JSON limits, and duration settings are implemented separately.
   Request quotas and server credential configuration remain pre-generation work.
   Do not send client tokens, snapshots or provider results.
-- **7F:** actual safe captioned-image renderer and final generation UI. Test PNG
-  layout, size and latency; do not substitute the original image for generated
-  media or a test fixture for a renderer.
+- **7F.1:** the real renderer is implemented and integrated behind the default-off
+  flag. Browser generation UI and approved live integration remain future work.
 - **7G:** guarded history/media retrieval, chain-specific filtering, expired/
   failed/unknown feedback, retained deleted-chain snapshots, responsive themes.
 

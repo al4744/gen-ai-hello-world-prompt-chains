@@ -1,10 +1,10 @@
 # Prompt Chain Tool
 
-The standalone Week 8 Caption Arena superadmin application, with Google OAuth, session management, themes, chain/step CRUD, custom-chain step reordering, a server-only execution core, and protected generation endpoints. The user confirmed installation of the step-management RPCs, execution migrations 003/004, and private execution bucket. The real artifact renderer, browser UI, and history pages remain future integration work.
+The standalone Week 8 Caption Arena superadmin application, with Google OAuth, session management, themes, chain/step CRUD, custom-chain step reordering, a server-only execution core, protected generation endpoints, and a production captioned-image renderer. The user confirmed installation of the step-management RPCs, execution migrations 003/004, and private execution bucket. Browser generation UI and history pages remain future integration work.
 
 See [the Step 7D.1 execution core](lib/execution/README.md) for module contracts, mocked validation, renderer requirements, deadline protections, and installed-persistence limitations. No real AI call or media upload was made during implementation.
 
-See [the Step 7E.1 endpoint contracts](lib/generation/README.md) for guarded preparation, private browser upload, execution and status. Actual generation remains blocked before any AI call until a real renderer is integrated.
+See [the Step 7E.1 endpoint contracts](lib/generation/README.md) for guarded preparation, private browser upload, execution and status. The [Step 7F.1 renderer](lib/execution/RENDERER.md) is integrated, but actual generation is disabled unless the server-only `PROMPT_CHAIN_GENERATION_ENABLED` flag is exactly `true`. No real server flag or credential was enabled during implementation or tests.
 
 Run `npm run dev -- --port 3002`, then visit `http://localhost:3002`.
 
@@ -79,6 +79,7 @@ node --test tests/notifications.test.mjs
 node --test tests/execution-persistence.test.mjs
 node --test tests/execution-core.test.mjs
 node --test tests/generation.test.mjs
+node --test tests/renderer.test.mjs
 git diff --check
 git status --short
 ```

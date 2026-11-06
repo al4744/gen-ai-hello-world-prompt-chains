@@ -7,6 +7,7 @@ import type { PrepareInput } from "@/lib/execution/engine";
 import type { ExecutionResult } from "@/lib/execution/types";
 import { invalid, json, readMutation, RequestError } from "./http";
 import { readRunStatus } from "./status";
+import { generationEnabled } from "@/lib/execution/enabled";
 
 function keys(row: Record<string, unknown>, allowed: string[]) {
   if (Object.keys(row).some(key => !allowed.includes(key))) throw invalid();
@@ -26,7 +27,7 @@ function resultResponse(result: ExecutionResult & { upload?: { bucket: string; p
   const error = result.error ? publicError(new ExecutionFault(result.error.code)) : undefined;
   const code = error?.code;
   const status = !error ? 200 : code === "input_invalid" ? 422 : code === "access_denied" ? 403
-    : code === "execution_conflict" ? 409 : ["renderer_unavailable", "provider_not_configured", "persistence_error"].includes(code!) ? 503 : 422;
+    : code === "execution_conflict" ? 409 : ["generation_disabled", "renderer_unavailable", "provider_not_configured", "persistence_error"].includes(code!) ? 503 : 422;
   return json({ runId: result.runId, status: result.status, ...(error ? { error } : {}),
     ...(result.upload ? { upload: { bucket: result.upload.bucket, path: result.upload.path, contentType: result.upload.contentType } } : {}) }, status);
 }
@@ -57,6 +58,7 @@ export function createGenerationHandlers(dependencies = {
       try { id = uuid(runId); } catch { throw invalid(); }
       const body = await readMutation(request);
       try { keys(object(body), []); } catch { throw invalid(); }
+      if (!generationEnabled()) return resultResponse({ runId: id, status: "unavailable", error: publicError(new ExecutionFault("generation_disabled")) });
       return resultResponse(await dependencies.engine().execute(id, { signal: request.signal }));
     }); },
     status(request: Request, runId: string) { return guarded(async () => {

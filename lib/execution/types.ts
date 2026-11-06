@@ -12,7 +12,7 @@ export const LIMITS = {
 export type ImageMime = "image/jpeg" | "image/png" | "image/webp";
 export type RunStatus = "prepared" | "running" | "succeeded" | "failed" | "interrupted";
 export type FailureCode = "input_invalid" | "provider_error" | "provider_timeout" | "output_invalid" | "artifact_error" | "persistence_error";
-export type ErrorCode = FailureCode | "access_denied" | "contract_mismatch" | "provider_not_configured"
+export type ErrorCode = FailureCode | "access_denied" | "contract_mismatch" | "provider_not_configured" | "generation_disabled"
   | "renderer_unavailable" | "cancelled" | "deadline_exceeded" | "execution_conflict";
 export type StepSnapshot = { id: string; step_order: number; name: string; prompt_template: string };
 export type RunPlan = {

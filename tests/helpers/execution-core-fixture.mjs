@@ -16,12 +16,20 @@ export const uuid = n => `00000000-0000-4000-8000-${n.toString(16).padStart(12, 
 export const hash = bytes => createHash("sha256").update(bytes).digest("hex");
 export const plain = value => JSON.parse(JSON.stringify(value));
 
-export function loadExecution(overrides = {}) {
+export function loadExecution(overrides = {}, environment = {}, onEnvironmentSet = () => {}) {
   const cache = new Map();
   const globals = { Buffer, Uint8Array, URL, TextDecoder, TextEncoder, Request, Response, Headers, crypto,
     AbortController, AbortSignal, ReadableStream, performance,
     setTimeout, clearTimeout, fetch: () => { throw new Error("Live network is disabled in tests"); },
-    process: { env: new Proxy({}, { get() { throw new Error("Real environment reads are disabled in tests"); } }) } };
+    process: { cwd: () => root, env: new Proxy({}, { get(_target, key) {
+      if (Object.hasOwn(environment, key)) return environment[key];
+      throw new Error("Real environment reads are disabled in tests");
+    }, set(target, key, value) {
+      // Native integration tests can forward a narrowly checked renderer write
+      // into their isolated child process without exposing real env reads.
+      onEnvironmentSet(key, value);
+      return Reflect.set(target, key, value);
+    } }) } };
   function load(path) {
     path = resolve(root, path);
     if (cache.has(path)) return cache.get(path).exports;

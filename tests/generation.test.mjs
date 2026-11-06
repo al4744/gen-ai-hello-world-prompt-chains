@@ -69,9 +69,10 @@ async function apiFixture(options = {}) {
     "@/lib/supabase/server": { createClient: async () => f.client },
     "@/lib/execution": { createServerExecutionEngine: () => load("lib/execution/index.ts").createServerExecutionEngine() },
   };
-  load = loadExecution(overrides);
+  load = loadExecution(overrides, { PROMPT_CHAIN_GENERATION_ENABLED: options.generationFlag });
   f.handlers = load("lib/generation/handlers.ts").createGenerationHandlers();
   f.loadRoutes = path => load(path);
+  f.productionEngine = () => load("lib/execution/index.ts").createServerExecutionEngine();
   f.input = { chainId: f.row.original_chain_id, idempotencyKey: uuid(5),
     image: { mime: f.row.input_mime, size: f.bytes.length, sha256: hash(f.bytes) }, userContext: f.row.user_context };
   return f;
@@ -194,24 +195,49 @@ test("RPC idempotency conflict is sanitized without retry or misleading upload d
   assert.equal(dto.status, "unavailable"); assert.equal(f.calls.length, 1);
 });
 
-test("production factory fails renderer gate before credential lookup, image download, claim or AI", async () => {
+test("production endpoint fails disabled gate before credential lookup, image download, claim or AI", async () => {
   const f = await apiFixture();
   const response = await f.handlers.execute(request(), f.runId);
   assert.equal(response.status, 503); assertPrivate(response);
   const dto = await response.json(); assertSafe(dto);
-  assert.equal(dto.runId, f.runId); assert.equal(dto.status, "prepared"); assert.equal(dto.error.code, "renderer_unavailable");
+  assert.equal(dto.runId, f.runId); assert.equal(dto.status, "unavailable"); assert.equal(dto.error.code, "generation_disabled");
   assert.equal(f.calls.length, 0); assert.equal(f.reads.length, 0); assert.equal(f.requests.length, 0); assert.equal(f.uploads.length, 0);
-  assert.equal(f.authReads, 2);
+  assert.equal(f.authReads, 1);
   // The loader throws on any real env read/network. Repeating never claims.
-  assert.equal((await (await f.handlers.execute(request(), f.runId)).json()).error.code, "renderer_unavailable");
+  assert.equal((await (await f.handlers.execute(request(), f.runId)).json()).error.code, "generation_disabled");
   assert.equal(f.calls.length, 0);
 });
 
-test("execution checks creator before renderer gate", async () => {
-  const f = await apiFixture(); f.row.creator_id = uuid(99); f.row.creator_id_snapshot = uuid(99);
+test("enabled execution checks creator before any provider or Storage work", async () => {
+  const f = await apiFixture({ generationFlag: "true" }); f.row.creator_id = uuid(99); f.row.creator_id_snapshot = uuid(99);
   const response = await f.handlers.execute(request(), f.runId);
   assert.equal(response.status, 403); assert.equal((await response.json()).error.code, "access_denied");
   assert.equal(f.calls.length, 0); assert.equal(f.reads.length, 0);
+});
+
+for (const flag of [undefined, "", "false", "TRUE", " true", "true ", true, 1]) {
+  test(`generation requires exact server flag, rejects ${JSON.stringify(flag)}`, async () => {
+    const f = await apiFixture({ generationFlag: flag });
+    const response = await f.handlers.execute(request(), f.runId);
+    assert.equal(response.status, 503); assertPrivate(response); assertSafe(await response.json());
+    assert.equal(f.row.status, "prepared"); assert.equal(f.queries.length, 0);
+    assert.equal(f.calls.length, 0); assert.equal(f.reads.length, 0); assert.equal(f.requests.length, 0); assert.equal(f.uploads.length, 0);
+  });
+}
+
+test("the server factory independently blocks disabled execution before key lookup or claim", async () => {
+  const f = await apiFixture();
+  const result = await f.productionEngine().execute(f.runId);
+  assert.equal(result.status, "prepared"); assert.equal(result.error.code, "generation_disabled"); assertSafe(result);
+  assert.equal(f.calls.length, 0); assert.equal(f.reads.length, 0); assert.equal(f.requests.length, 0); assert.equal(f.uploads.length, 0);
+});
+
+test("the enabled flag does not replace authorization", async () => {
+  for (const [options, expected] of [[{ user: null }, 401], [{ profile: { is_superadmin: false } }, 403]]) {
+    const f = await apiFixture({ ...options, generationFlag: "true" });
+    assert.equal((await f.handlers.execute(request(), f.runId)).status, expected);
+    assert.equal(f.queries.length, 0); assert.equal(f.calls.length, 0);
+  }
 });
 
 test("bad run UUID, nonempty execution payload, and wrong methods never advance a run", async () => {

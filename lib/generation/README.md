@@ -3,8 +3,9 @@
 These Node Route Handlers use the existing session client and execution core.
 The existing Cache Components configuration requires Node.js; this Next version
 forbids explicit route `runtime` exports, including `runtime = 'nodejs'`.
-No renderer, page, gallery, privileged credential, SQL or Storage-policy change
-is included. No live mutation, upload or AI request was used for validation.
+Step 7F.1 integrates a real [renderer](../execution/RENDERER.md) behind a default-off
+server-only safety flag. No page, gallery, privileged credential, SQL or
+Storage-policy change is included. No live mutation, upload or AI request was used.
 
 | Method and route | Request | Successful response |
 |---|---|---|
@@ -66,7 +67,7 @@ core's sanitized persistence error; no raw SQL message is classified or returned
    upload acknowledgement may require checking saved state; never overwrite it.
 5. Only after successful upload, POST `{}` to execute. The existing engine will
    independently stream, decode, bound and hash the private stored bytes before
-   claiming, once a renderer is integrated. Browser hashes are not trusted proof.
+   claiming when live execution is approved/enabled. Browser hashes are not trusted proof.
 
 Files go directly to Storage, avoiding a 5 MiB file in a function JSON/body
 request. No signed/public upload URLs, service key or external image URL is used.
@@ -74,13 +75,15 @@ Preparation/upload can be exercised now; actual execution remains unavailable.
 
 ## Execution gate and polling
 
-The production factory has **no renderer**. A valid owned prepared run returns
-HTTP 503 with `status: 'prepared'` and `error.code: 'renderer_unavailable'` before
-credential lookup, input download, claim or AI. No dummy artifact is supplied.
-Step 7F can pass a real `ArtifactRenderer` to `createServerExecutionEngine` in
-the handler factory; the orchestrator need not change. Terminal/running runs
-retain the engine's existing state/conflict behavior. No automatic execution,
-provider retry, resume or lease extension is added.
+The production factory now injects a real Sharp `ArtifactRenderer`. Execution
+requires the server-only `PROMPT_CHAIN_GENERATION_ENABLED` flag to equal the exact
+string `true`. By default, after authorization and request validation, the endpoint
+returns HTTP 503 with `status: 'unavailable'` and `error.code: 'generation_disabled'`
+before engine construction, run loading, credential lookup, Storage, claim or AI.
+Status remains available while execution is disabled. The factory independently
+checks the flag before provider configuration/input download/claim. When enabled,
+terminal/running runs retain the existing state/conflict behavior. No automatic
+execution, provider retry, resume, dummy output or lease extension is added.
 
 The execute route declares `maxDuration = 150` for platform headroom around the
 existing at-most-120-second core and fixed 120-second DB lease. Confirm hosting
@@ -110,7 +113,7 @@ RLS/Storage/RPC compatibility. Existing execution tests cover byte validation,
 single accepted claims/starts, partial failures, ambiguous acknowledgements,
 timeouts, provider response validation and sanitized results.
 
-Before actual generation: integrate/test the real renderer, approve quota and
+Before actual generation: approve live testing and the exact server flag, quota and
 provider-spending controls, confirm host duration and server-only provider
 configuration, and perform approved browser/RLS integration tests. Then add the
 generation UI, safe media retrieval and chain-specific history. Direct RPCs remain
