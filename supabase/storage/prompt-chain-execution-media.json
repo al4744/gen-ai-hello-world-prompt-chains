@@ -1,0 +1,6 @@
+{
+  "name": "prompt-chain-execution-media",
+  "public": false,
+  "fileSizeLimit": 5242880,
+  "allowedMimeTypes": ["image/jpeg", "image/png", "image/webp"]
+}

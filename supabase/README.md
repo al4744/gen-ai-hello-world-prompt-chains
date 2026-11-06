@@ -1,5 +1,8 @@
 # Step management RPC — review required
 
+For the separate **unapplied Step 7C.1 execution persistence proposal**, see
+[EXECUTION_PERSISTENCE.md](EXECUTION_PERSISTENCE.md). It does not replace either step-management RPC.
+
 The user confirmed that `migrations/202611050001_step_management.sql` was manually installed after Step 6B and its CRUD/arrow operations were live verified. The original implementation session did not execute it; the validation history below describes that session. Existing step writes continue using this installed v1 function. Step 6C's arbitrary drag moves use a separate, **unapplied** additive migration documented in [DRAG_REORDERING.md](DRAG_REORDERING.md). Neither migration was executed by this development session.
 
 ## Review the live schema first
