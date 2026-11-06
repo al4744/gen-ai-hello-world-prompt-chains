@@ -7,6 +7,7 @@ const items = [
   { href: "/dashboard", label: "Dashboard", number: "01" },
   { href: "/chains", label: "Prompt Chains", number: "02" },
   { href: "/generate", label: "Generate", number: "03" },
+  { href: "/history", label: "History", number: "04" },
 ];
 
 export default function WorkspaceNav() {

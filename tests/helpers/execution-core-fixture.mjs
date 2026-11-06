@@ -18,7 +18,7 @@ export const plain = value => JSON.parse(JSON.stringify(value));
 
 export function loadExecution(overrides = {}, environment = {}, onEnvironmentSet = () => {}) {
   const cache = new Map();
-  const globals = { Buffer, Uint8Array, URL, TextDecoder, TextEncoder, Request, Response, Headers, crypto,
+  const globals = { Buffer, Uint8Array, URL, URLSearchParams, TextDecoder, TextEncoder, Request, Response, Headers, crypto,
     AbortController, AbortSignal, ReadableStream, performance,
     setTimeout, clearTimeout, fetch: () => { throw new Error("Live network is disabled in tests"); },
     process: { cwd: () => root, env: new Proxy({}, { get(_target, key) {

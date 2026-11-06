@@ -1,10 +1,12 @@
 # Prompt Chain Tool
 
-The standalone Week 8 Caption Arena superadmin application, with Google OAuth, session management, themes, chain/step CRUD, custom-chain step reordering, a server-only execution core, protected generation endpoints, and a production captioned-image renderer. The protected `/generate` page now connects those pieces and retrieves completed private PNGs securely. The user confirmed installation of the step-management RPCs, execution migrations 003/004, and private execution bucket. The full history gallery remains Step 7G work.
+The standalone Week 8 Caption Arena superadmin application, with Google OAuth, session management, themes, chain/step CRUD, custom-chain step reordering, a server-only execution core, protected generation endpoints, and a production captioned-image renderer. The protected `/generate` page connects those pieces and retrieves completed private PNGs securely. `/history` browses completed generations across chains or by their original saved chain ID. The user confirmed installation of the step-management RPCs, execution migrations 003/004, and private execution bucket.
 
 See [the Step 7D.1 execution core](lib/execution/README.md) for module contracts, mocked validation, renderer requirements, deadline protections, and installed-persistence limitations. No real AI call or media upload was made during implementation.
 
 See [the Step 7E.1 endpoint contracts](lib/generation/README.md) for guarded preparation, private browser upload, execution and status. The [Step 7F.1 renderer](lib/execution/RENDERER.md) is integrated, but actual generation is disabled unless the server-only `PROMPT_CHAIN_GENERATION_ENABLED` flag is exactly `true`. No real server flag or credential was enabled during implementation or tests.
+
+See [the Step 7G.1 history interface](lib/history/README.md) for chain-specific filtering, paginated saved generations, complete captions and private PNG previews/downloads. History remains available while generation is disabled.
 
 Run `npm run dev -- --port 3002`, then visit `http://localhost:3002`.
 
@@ -81,6 +83,7 @@ node --test tests/execution-core.test.mjs
 node --test tests/generation.test.mjs
 node --test tests/renderer.test.mjs
 node --test tests/generate-page.test.mjs tests/generation-workflow.test.mjs tests/generation-media.test.mjs
+node --test tests/history.test.mjs
 git diff --check
 git status --short
 ```

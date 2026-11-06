@@ -5,8 +5,9 @@ The existing Cache Components configuration requires Node.js; this Next version
 forbids explicit route `runtime` exports, including `runtime = 'nodejs'`.
 Step 7F.1 integrates a real [renderer](../execution/RENDERER.md) behind a default-off
 server-only safety flag. Step 7F.8 adds the protected Generate page and completed
-PNG retrieval below. No history gallery, privileged credential, SQL or Storage
-policy change is included. No live mutation, upload or AI request was used.
+PNG retrieval below. Step 7G.1 adds [the protected history gallery](../history/README.md)
+using that same media endpoint. No privileged credential, SQL or Storage policy
+change is included. No live mutation, upload or AI request was used.
 
 | Method and route | Request | Successful response |
 |---|---|---|
@@ -216,7 +217,8 @@ timeouts, provider response validation and sanitized results.
 Before actual generation: approve live testing and the exact server flag, quota and
 provider-spending controls, confirm host duration and server-only provider
 configuration, and perform approved browser/RLS integration tests. Chain-specific
-history/gallery is Step 7G; this page only recovers the current run. Direct RPCs remain
+history/gallery is now implemented separately in Step 7G.1; Generate still only
+recovers the current run. Direct RPCs remain
 callable by an authorized creator under the installed model: server-only AI
 provenance is not attested by this HTTP layer. Orphan cleanup/retention remains
 separate work. No new permission or service identity is introduced here.

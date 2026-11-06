@@ -30,7 +30,7 @@ export default async function ChainDetailPage({ params, searchParams }: {
 
   return (
     <ChainPage title={chain.name} description={isSystemChain(chain) ? "Chain metadata and a read-only view of its stored steps." : "Manage chain metadata and ordered prompt steps."}
-      actions={<><BackToChains />{!isSystemChain(chain) && <>
+      actions={<><BackToChains /><Link href={`/history?chain=${chain.id}`} prefetch={false} className="button-secondary">Generation history</Link>{!isSystemChain(chain) && <>
         <Link href={`/chains/${chain.id}/edit`} prefetch={false} className="button-primary font-semibold">Edit chain</Link>
         <Link href={`/chains/${chain.id}/delete`} prefetch={false} className="button-danger-secondary">Delete</Link>
       </>}</>}>

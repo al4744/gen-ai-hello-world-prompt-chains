@@ -247,8 +247,10 @@ matches this source; future isolated/user-approved integration must check that.
 - **7F:** the real renderer, protected Generate page and completed PNG retrieval
   are implemented behind the default-off flag. Approved live integration remains
   future work; see [the generation workflow](../generation/README.md).
-- **7G:** guarded history/media retrieval, chain-specific filtering, expired/
-  failed/unknown feedback, retained deleted-chain snapshots, responsive themes.
+- **7G.1:** [guarded history](../history/README.md), chain-specific filtering,
+  retained deleted-chain identities, full saved captions and private media
+  previews/downloads are implemented. History shows verified successful runs;
+  Generate retains prepared/running/failed/interrupted/unknown recovery feedback.
 
 Existing persistence security limitations remain: the same authorized creator
 JWT can call granted RPCs directly, so SQL does not attest that reported text
