@@ -30,7 +30,7 @@ export default async function DashboardPage() {
         <section aria-labelledby="next-title" className="min-w-0 rounded-2xl border border-border bg-surface p-6">
           <p className="eyebrow">Workspace</p>
           <h2 id="next-title" className="mt-2 text-lg font-semibold">Manage your prompt chains</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">Open Prompt Chains in the navigation to manage chain metadata and inspect stored steps. Step editing and execution will follow in a later milestone.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">Create and manage prompt chains, edit and reorder steps, and explore the Generate and History pages. Image generation is available when enabled by an administrator.</p>
         </section>
       </div>
     </div>
